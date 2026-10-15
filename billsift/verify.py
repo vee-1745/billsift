@@ -20,6 +20,13 @@ STANDARD_RATES = [0.0, 0.25, 3.0, 5.0, 12.0, 18.0, 28.0]
 # Characters OCR commonly confuses, by what the position expects.
 _TO_DIGIT = {"O": "0", "Q": "0", "D": "0", "I": "1", "L": "1", "S": "5", "B": "8", "Z": "2", "G": "6"}
 _TO_LETTER = {"0": "O", "1": "I", "5": "S", "8": "B", "2": "Z", "6": "G"}
+_LOOKALIKE = {**_TO_LETTER, **{v: k for k, v in _TO_LETTER.items()}}
+_FOLD = str.maketrans({"O": "0", "Q": "0", "I": "1", "L": "1", "S": "5", "B": "8", "Z": "2", "G": "6"})
+
+
+def _fold(s: str) -> str:
+    """Collapse OCR look-alike characters so text can be compared tolerantly."""
+    return s.translate(_FOLD)
 
 
 # ---------------------------------------------------------------- GSTIN
@@ -57,7 +64,17 @@ def repair_gstin_token(token: str) -> str | None:
         else:
             out.append(ch)
     cand = "".join(out)
-    return cand if is_valid_gstin(cand) else None
+    if is_valid_gstin(cand):
+        return cand
+    # The last character is the checksum and may legitimately be a letter or a digit, so OCR
+    # can swap look-alikes there (O/0, I/1, S/5...). Accept only if the checksum confirms it.
+    if all(c in _CHARS for c in cand[:14]):
+        expected = gstin_checksum_char(cand[:14])
+        if expected in (cand[14], _LOOKALIKE.get(cand[14])):
+            fixed = cand[:14] + expected
+            if is_valid_gstin(fixed):
+                return fixed
+    return None
 
 
 def find_gstins_in_text(text: str) -> list[str]:
@@ -109,11 +126,13 @@ def normalize_date(s: str) -> str:
         if m:
             d, mo, y = map(int, m.groups())
         else:
-            m = re.match(r"^(\d{1,2})[-/. ]([A-Za-z]{3,9})[-/. ,]*(\d{2,4})$", s)
+            m = re.match(r"^(\d{1,2})[-/. ]([A-Za-z015]{3,9})[-/. ,]*(\d{2,4})$", s)
             if not m:
                 return ""
             d = int(m.group(1))
-            mo = _MONTHS.get(m.group(2)[:3].lower(), 0)
+            # OCR often reads the o in "Oct" as a zero, "Sep" as "5ep", "Jul" as "Ju1"
+            month_word = m.group(2).lower().translate(str.maketrans("015", "ols"))
+            mo = _MONTHS.get(month_word[:3], 0)
             y = int(m.group(3))
     if y < 100:
         y += 2000
@@ -224,11 +243,13 @@ def verify_bill(bill: Bill, ocr_text: str | None = None, today: date | None = No
         ]:
             if val > 0 and round(val, 2) not in nums:
                 flags.append(f"Not found in bill text: {label} {val:.2f} (possible misread)")
-        compact = re.sub(r"[^A-Za-z0-9]", "", ocr_text).upper()
-        if bill.vendor_gstin and bill.vendor_gstin.upper() not in compact:
+        # Compare with look-alike characters (O/0, I/1, S/5...) folded together, so a repaired
+        # GSTIN is still recognised in text where OCR printed the look-alike.
+        compact = _fold(re.sub(r"[^A-Za-z0-9]", "", ocr_text).upper())
+        if bill.vendor_gstin and _fold(bill.vendor_gstin.upper()) not in compact:
             flags.append("GSTIN not found in bill text")
         if bill.invoice_number:
-            inv = re.sub(r"[^A-Za-z0-9]", "", bill.invoice_number).upper()
+            inv = _fold(re.sub(r"[^A-Za-z0-9]", "", bill.invoice_number).upper())
             if inv and inv not in compact:
                 flags.append("Invoice number not found in bill text")
 

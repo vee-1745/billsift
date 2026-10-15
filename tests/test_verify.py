@@ -116,3 +116,20 @@ def test_gstin_repair_from_ocr_confusion():
 
 def test_repair_leaves_valid_untouched():
     assert repair_gstin(GOOD, "") == (GOOD, None)
+
+
+def test_checksum_char_ocr_lookalike_is_repaired():
+    # Find a GSTIN whose checksum is a letter that OCR could read as a digit (e.g. O -> 0)
+    for prefix in ["27AAECC5678B1Z", "27AABCU9603R1Z", "27AAAAA0000A1Z"]:
+        g = make_gstin(prefix)
+        if g[-1] in "OISBZG":
+            garbled = g[:-1] + {"O": "0", "I": "1", "S": "5", "B": "8", "Z": "2", "G": "6"}[g[-1]]
+            fixed, note = repair_gstin(garbled, f"GSTIN: {garbled}")
+            assert fixed == g and note
+            return
+    raise AssertionError("no suitable test GSTIN found")
+
+
+def test_normalize_date_ocr_zero_in_month():
+    assert normalize_date("07 0ct 2026") == "2026-10-07"
+    assert normalize_date("12 5ep 2026") == "2026-09-12"
