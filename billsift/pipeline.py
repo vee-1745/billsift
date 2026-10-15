@@ -9,7 +9,7 @@ from .extract import DEFAULT_MODEL, OLLAMA_URL, extract_bill
 from .ocr import read_document
 from .schema import Bill
 from .store import find_duplicate, insert_bill, lookup_category
-from .verify import verify_bill
+from .verify import normalize_gst_rate, verify_bill
 
 NOTE_PREFIX = "Note: "
 
@@ -21,12 +21,16 @@ def is_problem(flag: str) -> bool:
 def analyze(conn: sqlite3.Connection, bill: Bill, ocr_text: str | None = None,
             exclude_id: int | None = None, notes: list[str] | None = None) -> Bill:
     """Run every check on a bill and set its flags and status."""
+    notes = list(notes or [])
+    rate_note = normalize_gst_rate(bill)
+    if rate_note:
+        notes.append(rate_note)
     flags = verify_bill(bill, ocr_text)
     dup = find_duplicate(conn, bill, exclude_id)
     if dup:
         flags.append(f"Possible duplicate of bill #{dup} (same vendor and invoice number)")
     problems = list(flags)
-    bill.flags = [NOTE_PREFIX + n for n in (notes or [])] + problems
+    bill.flags = [NOTE_PREFIX + n for n in notes] + problems
     bill.status = "review" if problems else "ok"
     return bill
 

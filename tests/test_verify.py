@@ -133,3 +133,22 @@ def test_checksum_char_ocr_lookalike_is_repaired():
 def test_normalize_date_ocr_zero_in_month():
     assert normalize_date("07 0ct 2026") == "2026-10-07"
     assert normalize_date("12 5ep 2026") == "2026-09-12"
+
+
+def test_half_rate_from_model_is_corrected():
+    from billsift.verify import normalize_gst_rate
+
+    # the Chai Coffee case: CGST 2.5% + SGST 2.5% on 660 -> model said rate 2.5 instead of 5
+    b = good_bill(taxable_amount=660.0, gst_rate=2.5, cgst=16.5, sgst=16.5, total_amount=693.0)
+    note = normalize_gst_rate(b)
+    assert note and b.gst_rate == 5.0
+    assert verify_bill(b, today=date(2026, 10, 1)) == []
+
+
+def test_genuinely_wrong_rate_is_not_hidden():
+    from billsift.verify import normalize_gst_rate
+
+    # rate 12 but amounts are 18%: neither 12 nor 24 explains them, so it must stay flagged
+    b = good_bill(gst_rate=12.0)
+    assert normalize_gst_rate(b) is None
+    assert any("Tax mismatch" in f for f in verify_bill(b, today=date(2026, 10, 1)))

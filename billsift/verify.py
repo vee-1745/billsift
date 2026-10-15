@@ -164,6 +164,28 @@ def numbers_in_text(text: str) -> set[float]:
     return nums
 
 
+def normalize_gst_rate(bill: Bill) -> str | None:
+    """Models often return the per-component rate (CGST 2.5%) instead of the combined one (5%).
+
+    If the stated rate does not explain the tax amounts, but exactly doubling it does and the
+    result is a standard GST slab, use the doubled rate and return a note. A rate that is
+    simply wrong (neither explains the amounts) is left alone, so the checker still flags it.
+    """
+    tax = bill.cgst + bill.sgst
+    if bill.taxable_amount <= 0 or bill.cgst <= 0 or bill.sgst <= 0 or bill.gst_rate <= 0:
+        return None
+    expected = bill.taxable_amount * bill.gst_rate / 100
+    if abs(expected - tax) <= max(1.0, 0.005 * expected):
+        return None  # stated rate already matches
+    doubled = bill.gst_rate * 2
+    implied = tax / bill.taxable_amount * 100
+    if any(abs(doubled - r) < 0.01 for r in STANDARD_RATES) and abs(implied - doubled) <= 0.3:
+        old = bill.gst_rate
+        bill.gst_rate = doubled
+        return f"GST rate {old:g}% looked like the CGST/SGST half; using combined {doubled:g}%"
+    return None
+
+
 # ---------------------------------------------------------------- main check
 def verify_bill(bill: Bill, ocr_text: str | None = None, today: date | None = None) -> list[str]:
     """Run every check. Returns human-readable flags (empty list = clean).

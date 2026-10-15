@@ -29,7 +29,8 @@ Rules:
 - Copy values exactly as printed. Never calculate, round or guess.
 - vendor_name and vendor_gstin belong to the SELLER who issued the bill, not the buyer.
 - Amounts are plain numbers without currency symbols or commas.
-- gst_rate is the total GST percentage (for CGST 9% + SGST 9% it is 18).
+- gst_rate is the TOTAL GST percentage: CGST 9% + SGST 9% means 18, CGST 2.5% + SGST 2.5% means 5.
+  Never return only the CGST or SGST percentage.
 - If a field is not present, use "" for text and 0 for numbers.
 - invoice_date: copy the date exactly as printed."""
 
@@ -55,7 +56,10 @@ def llm_extract(ocr_text: str, model: str = DEFAULT_MODEL, url: str = OLLAMA_URL
         "model": model,
         "stream": False,
         "format": BILL_JSON_SCHEMA,
-        "options": {"temperature": 0, "num_ctx": 4096},
+        # keep_alive: stay loaded between bills (reloading the model is a big part of the wait).
+        # num_predict: the JSON answer is short, so cap it to stop any rambling generation.
+        "keep_alive": "30m",
+        "options": {"temperature": 0, "num_ctx": 3072, "num_predict": 350},
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Bill text:\n\"\"\"\n{ocr_text[:6000]}\n\"\"\""},

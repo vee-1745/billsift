@@ -78,3 +78,19 @@ def test_end_to_end_on_sample_images():
     assert any("Total mismatch" in f for f in flags)
     _, flags = run("06_BAD_gstin_typo.png")
     assert any("Invalid GSTIN" in f for f in flags)
+
+
+def test_pipeline_fixes_half_rate_from_llm(monkeypatch):
+    from billsift.pipeline import analyze
+    from billsift.store import connect
+
+    text = ("Cafe Chaicoffee\nGSTIN: 27AAECC5678B1ZO\nTAX INVOICE\nInvoice No: CC-7781  Date: 05-10-2026\n"
+            "Taxable Amount  660.00\nCGST @ 2.5%  16.50\nSGST @ 2.5%  16.50\nGrand Total  693.00\n")
+    llm = {"vendor_name": "Cafe Chaicoffee", "vendor_gstin": "27AAECC5678B1ZO",
+           "invoice_number": "CC-7781", "invoice_date": "05-10-2026", "taxable_amount": 660.0,
+           "cgst": 16.5, "sgst": 16.5, "igst": 0, "gst_rate": 2.5, "total_amount": 693.0}
+    monkeypatch.setattr(ex, "llm_extract", lambda *a, **k: llm)
+    bill, notes = ex.extract_bill(text, "cafe.png", use_llm=True)
+    analyze(connect(":memory:"), bill, ocr_text=text, notes=notes)
+    assert bill.gst_rate == 5.0 and bill.status == "ok"
+    assert any(f.startswith("Note:") and "half" in f for f in bill.flags)
