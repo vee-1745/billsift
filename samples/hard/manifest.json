@@ -1,0 +1,101 @@
+{
+  "H01_thermal_receipt.jpg": {
+    "vendor_gstin": "27AAFCS7788P1Z7",
+    "invoice_number": "4471",
+    "invoice_date": "2026-10-12",
+    "taxable_amount": 480.0,
+    "total_amount": 503.8,
+    "should_flag": false,
+    "note": "thermal receipt, caps, round-off line"
+  },
+  "H02_buyer_and_seller_gstin.png": {
+    "vendor_gstin": "27AABCM2211Q1ZF",
+    "invoice_number": "MM-25-1182",
+    "invoice_date": "2026-10-11",
+    "taxable_amount": 2395.0,
+    "total_amount": 2826.1,
+    "should_flag": false,
+    "note": "buyer GSTIN printed too; the seller is the vendor"
+  },
+  "H03_rs_prefix_amounts.png": {
+    "vendor_gstin": "27AAGCP4455R1ZN",
+    "invoice_number": "PPC/0311",
+    "invoice_date": "2026-10-09",
+    "taxable_amount": 1140.0,
+    "total_amount": 1276.8,
+    "should_flag": false,
+    "note": "amounts printed with 'Rs.' prefix, label 'Amount Payable'"
+  },
+  "H04_discount_igst.png": {
+    "vendor_gstin": "29AAHCE9090L1ZW",
+    "invoice_number": "BE/0455",
+    "invoice_date": "2026-10-10",
+    "taxable_amount": 8055.0,
+    "total_amount": 9504.9,
+    "should_flag": false,
+    "note": "10% discount line, inter-state IGST"
+  },
+  "H05_month_name_date.png": {
+    "vendor_gstin": "27AAICM1357N1Z1",
+    "invoice_number": "AB/25-26/0098",
+    "invoice_date": "2026-10-12",
+    "taxable_amount": 720.0,
+    "total_amount": 806.4,
+    "should_flag": false,
+    "note": "dd-Mon-yy date, 'Inv. No.' label"
+  },
+  "H06_hsn_column_slash_date.png": {
+    "vendor_gstin": "27AAKCB3030M1ZM",
+    "invoice_number": "OBH-7781",
+    "invoice_date": "2026-10-11",
+    "taxable_amount": 1960.0,
+    "total_amount": 2058.0,
+    "should_flag": false,
+    "note": "HSN column adds many extra numbers, yyyy/mm/dd date"
+  },
+  "H07_phone_photo_skewed_shadow.jpg": {
+    "vendor_gstin": "24AALCT5151H1ZA",
+    "invoice_number": "GT/2210",
+    "invoice_date": "2026-10-08",
+    "taxable_amount": 2470.0,
+    "total_amount": 2914.6,
+    "should_flag": false,
+    "note": "phone photo: perspective skew, heavy shadow, noise, JPEG q40"
+  },
+  "H08_faded_low_contrast.jpg": {
+    "vendor_gstin": "27AAOCD8484B1ZB",
+    "invoice_number": "S-0917",
+    "invoice_date": "2026-10-10",
+    "taxable_amount": 480.0,
+    "total_amount": 504.0,
+    "should_flag": false,
+    "note": "faded thermal print, low contrast, rotated"
+  },
+  "H09_digital_pdf.pdf": {
+    "vendor_gstin": "27AAMCC6060J1ZD",
+    "invoice_number": "CN-2026-5521",
+    "invoice_date": "2026-10-07",
+    "taxable_amount": 8999.0,
+    "total_amount": 10618.82,
+    "should_flag": false,
+    "note": "digital text PDF (embedded text, no OCR needed)"
+  },
+  "H10_scanned_pdf.pdf": {
+    "vendor_gstin": "27AANCG7272D1ZD",
+    "invoice_number": "ACG/0066",
+    "invoice_date": "2026-10-06",
+    "taxable_amount": 2830.0,
+    "total_amount": 3339.4,
+    "should_flag": false,
+    "note": "image-only scanned PDF, needs OCR"
+  },
+  "H11_BAD_tax_wrong.png": {
+    "vendor_gstin": "27AAGCP4455R1ZN",
+    "invoice_number": "PPC/0312",
+    "invoice_date": "2026-10-10",
+    "taxable_amount": 2400.0,
+    "total_amount": 2700.0,
+    "should_flag": true,
+    "note": "tax printed as 300 instead of 432: must be flagged"
+  }
+}

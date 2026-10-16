@@ -68,6 +68,22 @@ GSTIN, duplicate) to show the verifier working.
 python -m pytest -q
 ```
 
+## Evaluate it yourself
+
+`samples/hard/` holds 11 synthetic bills (invented vendors and GSTINs): thermal receipts, skewed phone
+photos with shadows and JPEG noise, a digital PDF, a scanned PDF, discounts, IGST, buyer + seller
+GSTINs, and one with a deliberately wrong tax. `manifest.json` has the true values.
+
+```powershell
+python scripts/make_hard_samples.py                  # regenerate the bills (optional)
+python scripts/eval_samples.py                       # rule-based only, no AI model
+python scripts/eval_samples.py --llm qwen2.5:3b      # with a local model
+python scripts/eval_samples.py --llm gemma3:4b
+```
+
+`SAFE` means the extraction had an error but the verifier flagged it. `BAD` means a wrong value went
+through unflagged, which is the failure BillSift is built to prevent. The test suite fails if that happens.
+
 ## Project layout
 
 ```

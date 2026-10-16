@@ -210,6 +210,9 @@ def verify_bill(bill: Bill, ocr_text: str | None = None, today: date | None = No
             d = datetime.strptime(bill.invoice_date, "%Y-%m-%d").date()
             if d > today:
                 flags.append(f"Invoice date {bill.invoice_date} is in the future")
+            elif (today - d).days > 3 * 366:
+                # safety net: a misread year (2026 -> 2011) must never pass silently
+                flags.append(f"Invoice date {bill.invoice_date} is more than 3 years old: check the year")
         except ValueError:
             flags.append(f"Invoice date not in a recognised format ({bill.invoice_date})")
 

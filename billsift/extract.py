@@ -122,12 +122,14 @@ def heuristic_extract(text: str) -> dict:
         valid = find_gstins_in_text(text)
         out["vendor_gstin"] = valid[0] if valid else ""
 
-    m = re.search(r"(?:Invoice|Inv|Bill)\s*(?:No|Number|Num|#)\.?\s*[:.\-]?\s*([A-Za-z0-9][A-Za-z0-9/\-_.]*)",
+    m = re.search(r"(?:Invoice|Inv\.?|Bill)\s*(?:No|Number|Num|#)\.?\s*[:.\-]?\s*([A-Za-z0-9][A-Za-z0-9/\-_.]*)",
                   text or "", re.I)
     if m:
         out["invoice_number"] = m.group(1).rstrip(".")
 
-    date_pat = r"(\d{1,2}[-/. ](?:\d{1,2}|[A-Za-z015]{3,9})[-/. ,]+\d{2,4})"
+    # (?<!\d) stops a match starting mid-number: "2026/10/11" must not be read as "26/10/11".
+    date_pat = (r"((?<!\d)(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}"
+                r"|\d{1,2}[-/. ](?:\d{1,2}|[A-Za-z015]{3,9})[-/. ,]+\d{2,4}(?!\d)))")
     m = re.search(r"(?:Date|Dated|Dt)\s*[:.\-]?\s*" + date_pat, text or "", re.I) or re.search(date_pat, text or "")
     if m:
         out["invoice_date"] = m.group(1)
@@ -140,7 +142,7 @@ def heuristic_extract(text: str) -> dict:
         lines,
         # [l1!|I] tolerates OCR reading the final "l" of "Total" as "!" or "1"
         [r"grand\s*tota[l1!|I]", r"tota[l1!|I]\s*amount", r"net\s*(?:amount|payable)",
-         r"amount\s*payable", r"\btota[l1!|I]"],
+         r"amount\s*payab\w*", r"\btota[l1!|I]"],  # payab\w*: OCR turns "Payable" into "Payabbe"
         exclude=r"taxable|sub\s*-?\s*tota|tax\s*tota",
     )
     rate = _rate_from_line(lines, r"\bigst\b")

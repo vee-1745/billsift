@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import re
 from pathlib import Path
 
 import numpy as np
@@ -65,13 +66,38 @@ def ocr_image(path: str | Path) -> str:
         return ocr_array(_to_array(img))
 
 
+def _pdf_lines(page) -> str:
+    """Embedded PDF text rebuilt into visual lines (label and value in separate table cells
+    would otherwise come out on separate lines and break 'Taxable Value   1,000.00')."""
+    words = page.get_text("words")  # (x0, y0, x1, y1, word, block, line, wordno)
+    items = sorted(((w[1] + w[3]) / 2, w[0], w[2], w[3] - w[1], w[4]) for w in words)
+    lines: list[list[tuple[float, float, str]]] = []
+    cy, ch = None, 1.0
+    for yc, x0, x1, h, t in items:
+        if cy is not None and abs(yc - cy) <= 0.5 * max(h, ch):
+            lines[-1].append((x0, x1, t))
+            cy = (cy + yc) / 2
+        else:
+            lines.append([(x0, x1, t)])
+            cy, ch = yc, h
+    out = []
+    for line in lines:
+        line.sort()
+        s, prev = line[0][2], line[0][1]
+        for x0, x1, t in line[1:]:
+            s += ("  " if x0 - prev > 10 else " ") + t
+            prev = x1
+        out.append(s)
+    return "\n".join(out)
+
+
 def ocr_pdf(path: str | Path) -> str:
     import pymupdf
 
     pages = []
     with pymupdf.open(path) as doc:
         for page in doc:
-            text = page.get_text().strip()
+            text = _pdf_lines(page).strip()
             if len(text) >= 40:  # digital PDF: use the embedded text, no OCR needed
                 pages.append(text)
             else:  # scanned PDF: render and OCR
@@ -81,11 +107,19 @@ def ocr_pdf(path: str | Path) -> str:
     return "\n\n".join(pages)
 
 
+_DOT_THOUSANDS = re.compile(r"(?<![\d.])(\d{1,3})((?:\.\d{3})+)(\.\d{2})(?!\d)")
+
+
+def fix_amount_separators(text: str) -> str:
+    """OCR often prints the thousands comma as a dot: '3.339.40' -> '3,339.40'."""
+    return _DOT_THOUSANDS.sub(lambda m: m.group(1) + m.group(2).replace(".", ",") + m.group(3), text)
+
+
 def read_document(path: str | Path) -> str:
     p = Path(path)
     ext = p.suffix.lower()
     if ext == ".pdf":
-        return ocr_pdf(p)
+        return fix_amount_separators(ocr_pdf(p))
     if ext in IMAGE_EXTS:
-        return ocr_image(p)
+        return fix_amount_separators(ocr_image(p))
     raise ValueError(f"Unsupported file type: {ext}")
