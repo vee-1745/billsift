@@ -84,6 +84,33 @@ python scripts/eval_samples.py --llm gemma3:4b
 `SAFE` means the extraction had an error but the verifier flagged it. `BAD` means a wrong value went
 through unflagged, which is the failure BillSift is built to prevent. The test suite fails if that happens.
 
+## Deploy a free public demo
+
+BillSift is built to run on your own computer. A hosted copy runs in **demo mode**
+(`BILLSIFT_DEMO=1`): sample bills only, pre-processed (`samples/hard/precomputed.json`), no AI model,
+a private in-memory database per visitor, nothing stored. Regenerate the pre-processed data after
+changing the pipeline with `python -m billsift.demo`.
+
+**Render (free web service, Docker)**
+
+1. Push this repo to GitHub.
+2. On render.com sign in with GitHub, then **New > Blueprint**, pick the repo and apply
+   (`render.yaml` does the rest). Or **New > Web Service**, pick the repo, language **Docker**,
+   instance type **Free**. The Dockerfile already sets the demo-mode variables.
+3. Wait for the first build, then open the `onrender.com` link.
+
+A free instance has 512 MB of RAM and sleeps after 15 minutes without traffic; waking takes about a
+minute. That is why uploads (OCR) are switched off there (`BILLSIFT_DEMO_UPLOADS=0`).
+
+**Streamlit Community Cloud (alternative, more RAM)**
+
+1. share.streamlit.io > **New app**, pick the repo, branch `main`, main file `app.py`.
+2. **Advanced settings**: Python 3.12, and under Secrets add `BILLSIFT_DEMO = "1"`. Do not skip this:
+   without it every visitor would share one database.
+3. `packages.txt` installs the system library OpenCV needs. Uploads stay enabled there.
+
+GitHub Pages cannot host BillSift: it only serves static files, and BillSift is a Python app.
+
 ## Project layout
 
 ```

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import time
 from datetime import date
 from pathlib import Path
@@ -9,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from billsift import demo
 from billsift.export import build_csv, build_workbook
 from billsift.extract import DEFAULT_MODEL, OLLAMA_URL, list_ollama_models
 from billsift.ocr import IMAGE_EXTS
@@ -21,6 +23,9 @@ from billsift.store import (
 from billsift.verify import normalize_date, to_float
 
 DATA_DIR = Path(os.environ.get("BILLSIFT_DATA", "data"))
+# BILLSIFT_DEMO=1 turns on the safe public-demo mode (used for hosted copies, see README).
+DEMO = os.environ.get("BILLSIFT_DEMO") == "1"
+SAMPLES_DIR = Path(__file__).resolve().parent / "samples" / "hard"
 TEXT_FIELDS = ["vendor_name", "vendor_gstin", "invoice_number", "invoice_date", "category"]
 NUM_FIELDS = ["taxable_amount", "gst_rate", "cgst", "sgst", "igst", "total_amount"]
 
@@ -32,16 +37,33 @@ def get_conn():
     return connect(DATA_DIR / "billsift.db")
 
 
-conn = get_conn()
+if DEMO:
+    # Public demo: every visitor gets a private in-memory database and a private temp folder,
+    # so nobody can see anyone else's bills and nothing is kept after the session ends.
+    if "demo_conn" not in st.session_state:
+        st.session_state["demo_conn"] = connect(":memory:")
+        st.session_state["demo_dir"] = Path(tempfile.mkdtemp(prefix="billsift_"))
+    conn = st.session_state["demo_conn"]
+    DATA_DIR = st.session_state["demo_dir"]
+else:
+    conn = get_conn()
 
 # ------------------------------------------------------------------ sidebar
 with st.sidebar:
     st.header("🧾 BillSift")
-    st.caption("Your bills never leave this computer.")
-    models = list_ollama_models(OLLAMA_URL)
+    if DEMO:
+        st.warning("**Public demo.** This server has no AI model, so it uses the rule-based "
+                   "extractor only. Try the sample bills, and please don't upload real bills. "
+                   "The full app runs entirely on your own computer with a local AI model, "
+                   "and your bills never leave it.")
+        models = None  # never probe for Ollama on a server
+    else:
+        st.caption("Your bills never leave this computer.")
+        models = list_ollama_models(OLLAMA_URL)
     if models is None:
-        st.warning("Ollama is not running. Using rule-based extraction (less accurate). "
-                   "Start Ollama for the AI model.")
+        if not DEMO:
+            st.warning("Ollama is not running. Using rule-based extraction (less accurate). "
+                       "Start Ollama for the AI model.")
         use_llm = False
         model = DEFAULT_MODEL
     else:
@@ -57,11 +79,43 @@ with st.sidebar:
 
 # ------------------------------------------------------------------ upload
 st.title("BillSift")
-st.write("Drop in photos or PDFs of bills. A local AI reads them, then **plain code double-checks "
-         "every GSTIN, tax amount and total** before anything reaches your spreadsheet.")
+if DEMO:
+    st.write("A small demo of BillSift. Rule-based extraction reads the sample bills, then **plain code "
+             "double-checks every GSTIN, tax amount and total** before anything reaches your spreadsheet. "
+             "The full app does the reading with a local AI model.")
+else:
+    st.write("Drop in photos or PDFs of bills. A local AI reads them, then **plain code double-checks "
+             "every GSTIN, tax amount and total** before anything reaches your spreadsheet.")
 
-uploads = st.file_uploader("Bills (PNG, JPG, PDF)", type=["png", "jpg", "jpeg", "pdf"],
-                           accept_multiple_files=True)
+sample_files = demo.sample_files(SAMPLES_DIR)
+if sample_files and not list_bills(conn):
+    use_cache = DEMO and demo.CACHE.exists()
+    suffix = " (pre-processed)" if use_cache else ""
+    if st.button(f"📂 Try it with {len(sample_files)} sample bills{suffix}: synthetic, no real data",
+                 type="primary"):
+        if use_cache:
+            demo.load(conn, SAMPLES_DIR)  # instant: free hosts have tiny CPUs
+        else:
+            sample_dir = DATA_DIR / "uploads" / "samples"
+            progress = st.progress(0.0, text="Starting...")
+            for i, f in enumerate(sample_files, 1):
+                progress.progress((i - 1) / len(sample_files), text=f"Reading {f.name} ({i}/{len(sample_files)})")
+                try:
+                    process_file(conn, f, model=model, use_llm=use_llm, uploads_dir=sample_dir)
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"{f.name}: {e}")
+        st.rerun()
+
+if DEMO and os.environ.get("BILLSIFT_DEMO_UPLOADS") == "0":
+    st.info("Uploads are switched off on this free demo server (it has only 512 MB of RAM). "
+            "Run BillSift locally to read your own bills.")
+    uploads = []
+else:
+    uploads = st.file_uploader("Bills (PNG, JPG, PDF)", type=["png", "jpg", "jpeg", "pdf"],
+                               accept_multiple_files=True)
+if DEMO and len(uploads) > 10:
+    st.warning("Demo limit: only the first 10 files will be processed.")
+    uploads = uploads[:10]
 if uploads and st.button("Process bills", type="primary"):
     batch_dir = DATA_DIR / "uploads" / str(int(time.time() * 1000))
     batch_dir.mkdir(parents=True, exist_ok=True)
@@ -83,8 +137,7 @@ if uploads and st.button("Process bills", type="primary"):
 # ------------------------------------------------------------------ table
 rows = list_bills(conn)
 if not rows:
-    st.info("No bills yet. Upload a few above, or generate demo bills with "
-            "`python scripts/make_samples.py` and upload them from the `samples` folder.")
+    st.info("No bills yet. Upload a few above, or press the sample-bills button.")
     st.stop()
 
 needs_review = [r for r in rows if r["status"] == "review"]

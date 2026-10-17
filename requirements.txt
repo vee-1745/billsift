@@ -5,6 +5,6 @@ requests>=2.31
 PyMuPDF>=1.24
 Pillow>=10.0
 numpy>=1.26
-rapidocr-onnxruntime>=1.2.3
+rapidocr-onnxruntime==1.2.3
 # dev
 pytest>=8.0
